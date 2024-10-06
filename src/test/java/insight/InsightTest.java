@@ -22,7 +22,7 @@ public class InsightTest {
     @Test
     public void test() throws SQLException {
 
-        DriverManager.registerDriver(new Driver());
+        DriverManager.registerDriver(new DriverInsight());
         DriverManager.registerDriver(new org.postgresql.Driver());
 
         String url = String.format("jdbc:insight:postgresql://%s:%s/%s",
@@ -32,13 +32,22 @@ public class InsightTest {
         props.put("user", container.getUsername());
         props.put("password", container.getPassword());
 
-        try (java.sql.Connection conn = DriverManager.getConnection(url, props)) {
+        try (Connection conn = DriverManager.getConnection(url, props)) {
+
+            DatabaseMetaData metaData = conn.getMetaData();
+            ResultSet catalogs = metaData.getCatalogs();
+            while (catalogs.next()) {
+            }
 
             try (Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery("select 1;")) {
                 while (rs.next()) {
                     System.out.println(rs.getInt(1));
                 }
+            }
+
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery("SELECT pg_sleep(3);")) {
             }
         }
     }

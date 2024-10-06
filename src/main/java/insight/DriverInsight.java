@@ -8,24 +8,34 @@ import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 
+import java.lang.reflect.Proxy;
 import java.sql.*;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.logging.Logger;
 
-public class Driver implements java.sql.Driver {
+public class DriverInsight implements Driver {
     private static final String URL_PREFIX = "jdbc:insight:";
 
     @Override
-    public Connection connect(String url, Properties props) throws SQLException {
+    public Connection  connect(String url, Properties props) throws SQLException {
         String targetUrl = removeUrlPrefix(url);
-        java.sql.Driver driver = DriverManager.getDriver(targetUrl);
+        Driver driver = DriverManager.getDriver(targetUrl);
         if (Objects.nonNull(driver)) {
             if (driver.acceptsURL(targetUrl)) {
-                return new Connection(driver.connect(targetUrl, props), initOtel());
+                return wrapWithProxy(driver.connect(targetUrl, props), initOtel());
             }
         }
         throw new SQLException("No suitable driver found for " + targetUrl);
+    }
+
+    private Connection wrapWithProxy(Connection conn, OpenTelemetry otel) {
+        Connection proxy = (Connection) Proxy.newProxyInstance(
+                conn.getClass().getClassLoader(),
+                conn.getClass().getInterfaces(),
+                new ConnectionInvocationHandler(conn, otel)
+        );
+        return proxy;
     }
 
     private OpenTelemetry initOtel() {
@@ -56,7 +66,7 @@ public class Driver implements java.sql.Driver {
             return false;
         }
         String targetUrl = removeUrlPrefix(url);
-        java.sql.Driver driver = DriverManager.getDriver(targetUrl);
+        Driver driver = DriverManager.getDriver(targetUrl);
         boolean result = Objects.nonNull(driver);
         return result;
     }
