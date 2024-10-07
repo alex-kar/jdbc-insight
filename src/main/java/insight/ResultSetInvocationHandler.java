@@ -3,6 +3,7 @@ package insight;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
 
 import java.lang.reflect.InvocationHandler;
@@ -17,16 +18,20 @@ import static insight.DriverInsight.TRACER_NAME;
 public class ResultSetInvocationHandler implements InvocationHandler {
     private final ResultSet delegate;
     private final OpenTelemetry otel;
+    private final Context context;
 
-    public ResultSetInvocationHandler(ResultSet rs, OpenTelemetry otel) {
+    public ResultSetInvocationHandler(ResultSet rs, OpenTelemetry otel, Context context) {
         this.delegate = rs;
         this.otel = otel;
+        this.context = context;
     }
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         Tracer tracer = otel.getTracer(TRACER_NAME);
-        Span span = tracer.spanBuilder("resultset span").startSpan();
+        Span span = tracer.spanBuilder("resultset span")
+                .setParent(context)
+                .startSpan();
         try (Scope scope = span.makeCurrent()) {
             return invokeMethod(method, args);
         } finally {
@@ -49,13 +54,13 @@ public class ResultSetInvocationHandler implements InvocationHandler {
             return Proxy.newProxyInstance(
                     meta.getClass().getClassLoader(),
                     meta.getClass().getInterfaces(),
-                    new ResultSetMetaDataInvocationHandler(meta, otel)
+                    new ResultSetMetaDataInvocationHandler(meta, otel, Context.current())
             );
         }
         return Proxy.newProxyInstance(
                 result.getClass().getClassLoader(),
                 result.getClass().getInterfaces(),
-                new UnsupportedInterfaceInvocationHandler(result, otel));
+                new UnsupportedInterfaceInvocationHandler(result, otel, Context.current()));
     }
 
 }

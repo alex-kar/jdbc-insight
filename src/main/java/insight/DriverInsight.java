@@ -3,6 +3,7 @@ package insight;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
 import io.opentelemetry.exporter.logging.LoggingSpanExporter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
@@ -45,7 +46,7 @@ public class DriverInsight implements Driver {
         Connection proxy = (Connection) Proxy.newProxyInstance(
                 conn.getClass().getClassLoader(),
                 conn.getClass().getInterfaces(),
-                new ConnectionInvocationHandler(conn, otel)
+                new ConnectionInvocationHandler(conn, otel, Context.current())
         );
         return proxy;
     }

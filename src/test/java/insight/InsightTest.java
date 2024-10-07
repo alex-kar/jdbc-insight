@@ -1,5 +1,16 @@
 package insight;
 
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.exporter.logging.LoggingSpanExporter;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +22,8 @@ import org.testcontainers.utility.DockerImageName;
 import java.sql.*;
 import java.sql.DatabaseMetaData;
 import java.util.Properties;
+
+import static insight.DriverInsight.TRACER_NAME;
 
 @ExtendWith(MockitoExtension.class)
 @Testcontainers
