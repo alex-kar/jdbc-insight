@@ -1,6 +1,9 @@
 package insight;
 
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
 import io.opentelemetry.exporter.logging.LoggingSpanExporter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
@@ -15,6 +18,8 @@ import java.util.Properties;
 import java.util.logging.Logger;
 
 public class DriverInsight implements Driver {
+    public static final String TRACER_NAME = "insight";
+
     private static final String URL_PREFIX = "jdbc:insight:";
 
     @Override
@@ -23,7 +28,14 @@ public class DriverInsight implements Driver {
         Driver driver = DriverManager.getDriver(targetUrl);
         if (Objects.nonNull(driver)) {
             if (driver.acceptsURL(targetUrl)) {
-                return wrapWithProxy(driver.connect(targetUrl, props), initOtel());
+                OpenTelemetry otel = initOtel();
+                Tracer tracer = otel.tracerBuilder(TRACER_NAME).build();
+                Span span = tracer.spanBuilder("driver span").startSpan();
+                try (Scope scope = span.makeCurrent()) {
+                    return wrapWithProxy(driver.connect(targetUrl, props), otel);
+                } finally {
+                    span.end();
+                }
             }
         }
         throw new SQLException("No suitable driver found for " + targetUrl);

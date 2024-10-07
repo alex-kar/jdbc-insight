@@ -10,6 +10,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.Statement;
 
+import static insight.DriverInsight.TRACER_NAME;
+
 public class UnsupportedInterfaceInvocationHandler implements InvocationHandler {
     private final Object delegate;
     private final OpenTelemetry otel;
@@ -21,7 +23,7 @@ public class UnsupportedInterfaceInvocationHandler implements InvocationHandler 
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        Tracer tracer = otel.tracerBuilder("insight.unsupported").build();
+        Tracer tracer = otel.getTracer(TRACER_NAME);
         Span span = tracer.spanBuilder("unsupported interface span").startSpan();
         try (Scope scope = span.makeCurrent()) {
             return invokeMethod(method, args);

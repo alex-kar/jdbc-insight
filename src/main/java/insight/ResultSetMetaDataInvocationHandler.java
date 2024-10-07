@@ -11,6 +11,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.ResultSetMetaData;
 
+import static insight.DriverInsight.TRACER_NAME;
+
 public class ResultSetMetaDataInvocationHandler implements InvocationHandler {
     private final ResultSetMetaData delegate;
     private final OpenTelemetry otel;
@@ -22,7 +24,7 @@ public class ResultSetMetaDataInvocationHandler implements InvocationHandler {
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        Tracer tracer = otel.tracerBuilder("insight.resultsetmetadata").build();
+        Tracer tracer = otel.getTracer(TRACER_NAME);
         Span span = tracer.spanBuilder("resultset metadata span").startSpan();
         try (Scope scope = span.makeCurrent()) {
             return invokeMethod(method, args);
