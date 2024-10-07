@@ -8,23 +8,21 @@ import io.opentelemetry.context.Scope;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.sql.Connection;
 import java.sql.Statement;
 
-public class ConnectionInvocationHandler implements InvocationHandler {
-    private final Connection delegate;
+public class UnsupportedInterfaceInvocationHandler implements InvocationHandler {
+    private final Object delegate;
     private final OpenTelemetry otel;
 
-    public ConnectionInvocationHandler(Connection conn, OpenTelemetry otel) {
-        this.delegate = conn;
+    public UnsupportedInterfaceInvocationHandler(Object obj, OpenTelemetry otel) {
+        this.delegate = obj;
         this.otel = otel;
     }
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        Tracer tracer = otel.tracerBuilder("insight.connection").build();
-        Span span = tracer.spanBuilder("connection span").startSpan();
+        Tracer tracer = otel.tracerBuilder("insight.unsupported").build();
+        Span span = tracer.spanBuilder("unsupported interface span").startSpan();
         try (Scope scope = span.makeCurrent()) {
             return invokeMethod(method, args);
         } finally {
@@ -41,19 +39,10 @@ public class ConnectionInvocationHandler implements InvocationHandler {
     }
 
     private Object proxy(Method method, Object[] args) throws InvocationTargetException, IllegalAccessException {
-        Object result = method.invoke(delegate, args);
         if (Statement.class.isAssignableFrom(method.getReturnType())) {
-            Statement stmt = (Statement) result;
-            return Proxy.newProxyInstance(
-                    stmt.getClass().getClassLoader(),
-                    stmt.getClass().getInterfaces(),
-                    new StatementInvocationHandler(stmt, otel)
-            );
+            return method.invoke(delegate, args);
         }
-        return Proxy.newProxyInstance(
-                result.getClass().getClassLoader(),
-                result.getClass().getInterfaces(),
-                new UnsupportedInterfaceInvocationHandler(result, otel));
+        return method.invoke(delegate, args);
     }
 
 }
