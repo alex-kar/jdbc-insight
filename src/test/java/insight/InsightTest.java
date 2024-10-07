@@ -34,20 +34,18 @@ public class InsightTest {
 
         try (Connection conn = DriverManager.getConnection(url, props)) {
 
-            DatabaseMetaData metaData = conn.getMetaData();
-            ResultSet catalogs = metaData.getCatalogs();
+            DatabaseMetaData databaseMetaData = conn.getMetaData();
+            ResultSet catalogs = databaseMetaData.getCatalogs();
             while (catalogs.next()) {
             }
 
             try (Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery("select 1;")) {
+                ResultSetMetaData resultSetMetaData = rs.getMetaData();
+                resultSetMetaData.getColumnTypeName(1);
                 while (rs.next()) {
                     System.out.println(rs.getInt(1));
                 }
-            }
-
-            try (Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery("SELECT pg_sleep(3);")) {
             }
         }
     }
