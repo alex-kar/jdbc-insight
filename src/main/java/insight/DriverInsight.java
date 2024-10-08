@@ -20,7 +20,6 @@ import java.util.logging.Logger;
 
 public class DriverInsight implements Driver {
     public static final String TRACER_NAME = "insight";
-
     private static final String URL_PREFIX = "jdbc:insight:";
 
     @Override
@@ -31,7 +30,7 @@ public class DriverInsight implements Driver {
             if (driver.acceptsURL(targetUrl)) {
                 OpenTelemetry otel = initOtel();
                 Tracer tracer = otel.tracerBuilder(TRACER_NAME).build();
-                Span span = tracer.spanBuilder("driver span").startSpan();
+                Span span = tracer.spanBuilder(Driver.class.getSimpleName()).startSpan();
                 try (Scope scope = span.makeCurrent()) {
                     return wrapWithProxy(driver.connect(targetUrl, props), otel);
                 } finally {

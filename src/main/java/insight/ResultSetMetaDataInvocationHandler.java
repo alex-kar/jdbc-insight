@@ -28,7 +28,7 @@ public class ResultSetMetaDataInvocationHandler implements InvocationHandler {
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         Tracer tracer = otel.getTracer(TRACER_NAME);
-        Span span = tracer.spanBuilder("resultset metadata span")
+        Span span = tracer.spanBuilder(method.getReturnType().getSimpleName())
                 .setParent(context)
                 .startSpan();
         try (Scope scope = span.makeCurrent()) {
