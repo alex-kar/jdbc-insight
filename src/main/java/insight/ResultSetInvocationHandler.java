@@ -1,5 +1,6 @@
 package insight;
 
+import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
@@ -14,22 +15,24 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 
 import static insight.DriverInsight.TRACER_NAME;
+import static insight.DriverInsight.initOtel;
+import static insight.Utils.buildMethodSignature;
 
 public class ResultSetInvocationHandler implements InvocationHandler {
     private final ResultSet delegate;
-    private final OpenTelemetry otel;
     private final Context context;
 
-    public ResultSetInvocationHandler(ResultSet rs, OpenTelemetry otel, Context context) {
+    public ResultSetInvocationHandler(ResultSet rs, Context context) {
         this.delegate = rs;
-        this.otel = otel;
         this.context = context;
     }
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        GlobalOpenTelemetry.resetForTest();
+        OpenTelemetry otel = initOtel("ResultSet");
         Tracer tracer = otel.getTracer(TRACER_NAME);
-        Span span = tracer.spanBuilder(method.getReturnType().getSimpleName())
+        Span span = tracer.spanBuilder(buildMethodSignature(method))
                 .setParent(context)
                 .startSpan();
         try (Scope scope = span.makeCurrent()) {
@@ -54,13 +57,13 @@ public class ResultSetInvocationHandler implements InvocationHandler {
             return Proxy.newProxyInstance(
                     meta.getClass().getClassLoader(),
                     meta.getClass().getInterfaces(),
-                    new ResultSetMetaDataInvocationHandler(meta, otel, Context.current())
+                    new ResultSetMetaDataInvocationHandler(meta, Context.current())
             );
         }
         return Proxy.newProxyInstance(
                 result.getClass().getClassLoader(),
                 result.getClass().getInterfaces(),
-                new UnsupportedInterfaceInvocationHandler(result, otel, Context.current()));
+                new UnsupportedInterfaceInvocationHandler(result, Context.current()));
     }
 
 }

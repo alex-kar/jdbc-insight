@@ -22,7 +22,7 @@ public class DriverInsight implements Driver {
     public static final String TRACER_NAME = "insight";
     private static final String URL_PREFIX = "jdbc:insight:";
 
-    private static final OpenTelemetry otel = initOtel();
+    private static final OpenTelemetry otel = initOtel("Driver");
 
     @Override
     public Connection  connect(String url, Properties props) throws SQLException {
@@ -46,12 +46,12 @@ public class DriverInsight implements Driver {
         Connection proxy = (Connection) Proxy.newProxyInstance(
                 conn.getClass().getClassLoader(),
                 conn.getClass().getInterfaces(),
-                new ConnectionInvocationHandler(conn, otel, Context.current())
+                new ConnectionInvocationHandler(conn, Context.current())
         );
         return proxy;
     }
 
-    private static OpenTelemetry initOtel() {
+    public static OpenTelemetry initOtel(String name) {
         OtlpGrpcSpanExporter grpcSpanExporter = OtlpGrpcSpanExporter.builder()
                 .setEndpoint("http://127.0.0.1:4317")
                 .build();
@@ -62,13 +62,13 @@ public class DriverInsight implements Driver {
                 .addSpanProcessor(SimpleSpanProcessor.builder(grpcSpanExporter).build())
                 .addSpanProcessor(SimpleSpanProcessor.builder(loggingSpanExporter).build())
                 .setResource(Resource.getDefault().merge(Resource.builder()
-                        .put("service.name", "insight")
+                        .put("service.name", name)
                         .build()))
                 .build();
 
         OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
                 .setTracerProvider(tracerProvider)
-                .buildAndRegisterGlobal();
+                .build();
 
         return openTelemetry;
     }
