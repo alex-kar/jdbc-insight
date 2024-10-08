@@ -22,13 +22,14 @@ public class DriverInsight implements Driver {
     public static final String TRACER_NAME = "insight";
     private static final String URL_PREFIX = "jdbc:insight:";
 
+    private static final OpenTelemetry otel = initOtel();
+
     @Override
     public Connection  connect(String url, Properties props) throws SQLException {
         String targetUrl = removeUrlPrefix(url);
         Driver driver = DriverManager.getDriver(targetUrl);
         if (Objects.nonNull(driver)) {
             if (driver.acceptsURL(targetUrl)) {
-                OpenTelemetry otel = initOtel();
                 Tracer tracer = otel.tracerBuilder(TRACER_NAME).build();
                 Span span = tracer.spanBuilder(Driver.class.getSimpleName()).startSpan();
                 try (Scope scope = span.makeCurrent()) {
@@ -50,7 +51,7 @@ public class DriverInsight implements Driver {
         return proxy;
     }
 
-    private OpenTelemetry initOtel() {
+    private static OpenTelemetry initOtel() {
         OtlpGrpcSpanExporter grpcSpanExporter = OtlpGrpcSpanExporter.builder()
                 .setEndpoint("http://127.0.0.1:4317")
                 .build();
