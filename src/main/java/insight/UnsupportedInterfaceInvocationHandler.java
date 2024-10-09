@@ -1,7 +1,6 @@
 package insight;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
@@ -12,8 +11,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.Statement;
 
-import static insight.DriverInsight.TRACER_NAME;
-import static insight.DriverInsight.initOtel;
+import static insight.OtelFactory.initTracer;
 
 public class UnsupportedInterfaceInvocationHandler implements InvocationHandler {
     private final Object delegate;
@@ -27,8 +25,7 @@ public class UnsupportedInterfaceInvocationHandler implements InvocationHandler 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         GlobalOpenTelemetry.resetForTest();
-        OpenTelemetry otel = initOtel("Unsupported Interface");
-        Tracer tracer = otel.getTracer(TRACER_NAME);
+        Tracer tracer = initTracer("Unsupported Interface");
         Span span = tracer.spanBuilder(method.getReturnType().getSimpleName())
                 .setParent(context)
                 .startSpan();

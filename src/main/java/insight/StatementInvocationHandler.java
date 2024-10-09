@@ -1,7 +1,6 @@
 package insight;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
@@ -14,53 +13,57 @@ import java.lang.reflect.Proxy;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
-import static insight.DriverInsight.TRACER_NAME;
-import static insight.DriverInsight.initOtel;
+import static insight.OtelFactory.initTracer;
 import static insight.Utils.buildMethodSignature;
+import static insight.Utils.initTreeNode;
 
 public class StatementInvocationHandler implements InvocationHandler {
     private final Statement delegate;
+    private final Tracer tracer;
     private final Context context;
 
-    public StatementInvocationHandler(Statement stmt, Context context) {
+    public StatementInvocationHandler(Statement stmt, Tracer tracer, Context context) {
         this.delegate = stmt;
+        this.tracer = tracer;
         this.context = context;
     }
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        GlobalOpenTelemetry.resetForTest();
-        OpenTelemetry otel = initOtel("Statement");
-        Tracer tracer = otel.getTracer(TRACER_NAME);
-        Span span = tracer.spanBuilder(buildMethodSignature(method))
+        Span stmtSpan = tracer.spanBuilder(buildMethodSignature(method))
                 .setParent(context)
                 .startSpan();
-        try (Scope scope = span.makeCurrent()) {
-            return invokeMethod(method, args);
+        try (Scope stmtScope = stmtSpan.makeCurrent()) {
+            return invokeMethod(method, args, Context.current());
         } finally {
-            span.end();
+            stmtSpan.end();
         }
     }
 
-    private Object invokeMethod(Method method, Object[] args) throws InvocationTargetException, IllegalAccessException {
+    private Object invokeMethod(Method method, Object[] args, Context context) throws InvocationTargetException, IllegalAccessException {
         Class<?> returnType = method.getReturnType();
         if (returnType.isInterface()) {
-            return proxy(method, args);
+            return proxy(method, args, context);
         }
         return method.invoke(delegate, args);
     }
 
-    private Object proxy(Method method, Object[] args) throws InvocationTargetException, IllegalAccessException {
+    private Object proxy(Method method, Object[] args, Context context) throws InvocationTargetException, IllegalAccessException {
+        Object result = method.invoke(delegate, args);
         if (ResultSet.class.isAssignableFrom(method.getReturnType())) {
-            Object result = method.invoke(delegate, args);
             ResultSet rs = (ResultSet) result;
+            Tracer rsTracer = initTracer("ResultSet");
+            Context nodeContext = initTreeNode(rsTracer, context, "ResultSet");
             return Proxy.newProxyInstance(
                     rs.getClass().getClassLoader(),
                     rs.getClass().getInterfaces(),
-                    new ResultSetInvocationHandler(rs, Context.current())
+                    new ResultSetInvocationHandler(rs, rsTracer, nodeContext)
             );
         }
-        return method.invoke(delegate, args);
+        return Proxy.newProxyInstance(
+                result.getClass().getClassLoader(),
+                result.getClass().getInterfaces(),
+                new UnsupportedInterfaceInvocationHandler(result, Context.current()));
     }
 
 }
