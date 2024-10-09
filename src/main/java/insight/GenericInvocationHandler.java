@@ -11,6 +11,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.Objects;
 
 import static insight.OtelFactory.initTracer;
 import static insight.Utils.buildMethodSignature;
@@ -55,6 +56,9 @@ public class GenericInvocationHandler implements InvocationHandler {
 
     private Object proxy(Method method, Object[] args, Tracer tracer, Context context) throws InvocationTargetException, IllegalAccessException {
         Object result = method.invoke(delegate, args);
+        if (Objects.isNull(result)) {
+            return null;
+        }
         return Proxy.newProxyInstance(
                 result.getClass().getClassLoader(),
                 result.getClass().getInterfaces(),
