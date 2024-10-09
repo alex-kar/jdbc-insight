@@ -1,5 +1,7 @@
 package insight;
 
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
@@ -9,8 +11,6 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.sql.Connection;
-import java.sql.Statement;
 
 import static insight.OtelFactory.initTracer;
 import static insight.Utils.buildMethodSignature;
@@ -34,6 +34,10 @@ public class GenericInvocationHandler implements InvocationHandler {
                 .startSpan();
         try (Scope scope = span.makeCurrent()) {
             return invokeMethod(method, args, Context.current());
+        } catch (Exception e) {
+            span.recordException(e, Attributes.of(AttributeKey.booleanKey("exception.escaped"), true));
+            span.setAttribute(AttributeKey.booleanKey("error"), true);
+            throw e;
         } finally {
             span.end();
         }
