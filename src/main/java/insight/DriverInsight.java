@@ -27,7 +27,7 @@ public class DriverInsight implements Driver {
                 Span driverSpan = driverTracer.spanBuilder(Driver.class.getSimpleName()).startSpan();
                 try (Scope dirverScope = driverSpan.makeCurrent()) {
                     Tracer connTracer = initTracer("Connection");
-                    Span connSpan = connTracer.spanBuilder("Connection").startSpan();
+                    Span connSpan = connTracer.spanBuilder(targetUrl).startSpan();
                     try (Scope connScope = connSpan.makeCurrent()) {
                         return wrapWithProxy(driver.connect(targetUrl, props), connTracer, Context.current());
                     } finally {
