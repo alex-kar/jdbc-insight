@@ -45,7 +45,7 @@ public class DriverInsight implements Driver {
         Connection proxy = (Connection) Proxy.newProxyInstance(
                 conn.getClass().getClassLoader(),
                 conn.getClass().getInterfaces(),
-                new ConnectionInvocationHandler(conn, tracer, parentContext)
+                new GenericInvocationHandler(conn, tracer, parentContext)
         );
         return proxy;
     }
