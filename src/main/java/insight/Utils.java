@@ -6,9 +6,8 @@ import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.StringJoiner;
-
-import static insight.OtelFactory.initTracer;
 
 public class Utils {
 
@@ -16,13 +15,13 @@ public class Utils {
         String name = method.getName();
         String args = buildArgs(method);
         String returnType = method.getReturnType().getSimpleName();
-        return String.format("%s(%s) -> %s", name, args, returnType);
+        return String.format("%s(%s): %s", name, args, returnType);
     }
 
     private static String buildArgs(Method method) {
         StringJoiner joiner = new StringJoiner(", ");
-        for (Class<?> param : method.getParameterTypes()) {
-            joiner.add(param.getSimpleName() + ": " + param.getName());
+        for (Parameter param : method.getParameters()) {
+            joiner.add(param.getName() + ": " + param.getType().getSimpleName());
         }
         return joiner.toString();
     }

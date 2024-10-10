@@ -7,10 +7,7 @@ import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
+import java.lang.reflect.*;
 import java.util.Objects;
 
 import static insight.OtelFactory.initTracer;
@@ -34,13 +31,26 @@ public class GenericInvocationHandler implements InvocationHandler {
                 .setParent(context)
                 .startSpan();
         try (Scope scope = span.makeCurrent()) {
-            return invokeMethod(method, args, Context.current());
+            Object result = invokeMethod(method, args, Context.current());
+            setAttributes(span, method, args, result);
+            return result;
         } catch (Exception e) {
             span.recordException(e, Attributes.of(AttributeKey.booleanKey("exception.escaped"), true));
             span.setAttribute(AttributeKey.booleanKey("error"), true);
             throw e;
         } finally {
             span.end();
+        }
+    }
+
+    private void setAttributes(Span span, Method method, Object[] args, Object result) {
+        if (!Objects.isNull(args)) {
+            for (int i = 0; i < args.length; i++) {
+                span.setAttribute("arg" + i, Objects.isNull(args[i]) ? null : args[i].toString());
+            }
+        }
+        if (!void.class.equals(method.getReturnType())) {
+            span.setAttribute("return", Objects.isNull(result) ? null : result.toString());
         }
     }
 
