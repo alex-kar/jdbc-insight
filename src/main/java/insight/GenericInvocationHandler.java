@@ -8,6 +8,8 @@ import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
 
 import java.lang.reflect.*;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.Objects;
 
 import static insight.OtelFactory.initTracer;
@@ -58,7 +60,13 @@ public class GenericInvocationHandler implements InvocationHandler {
         Class<?> returnType = method.getReturnType();
         if (returnType.isInterface()) {
             Tracer tracer = initTracer(returnType.getSimpleName());
-            Context nodeContext = initTreeNode(tracer, context, returnType.getSimpleName());
+            String nodeName = returnType.getSimpleName();
+            if (method.getReturnType().isAssignableFrom(ResultSet.class)) {
+                if (!Objects.isNull(args)) {
+                    nodeName = String.format("SQL: [%s]", args[0]);
+                }
+            }
+            Context nodeContext = initTreeNode(tracer, context, nodeName);
             return proxy(method, args, tracer, nodeContext);
         }
         return method.invoke(delegate, args);
