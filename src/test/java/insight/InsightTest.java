@@ -23,7 +23,7 @@ public class InsightTest {
     public void test() throws SQLException {
 
         DriverManager.registerDriver(new DriverInsight());
-        DriverManager.registerDriver(new org.postgresql.Driver());
+//        DriverManager.registerDriver(new org.postgresql.Driver());
 
         String url = String.format("jdbc:insight:postgresql://%s:%s/%s",
                 container.getHost(), container.getFirstMappedPort(), container.getDatabaseName());
