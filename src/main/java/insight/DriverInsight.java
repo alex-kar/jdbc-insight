@@ -37,8 +37,8 @@ public class DriverInsight implements Driver {
         }
         if (Objects.nonNull(driver)) {
             if (driver.acceptsURL(targetUrl)) {
-                Tracer driverTracer = initTracer("Driver");
-                Span driverSpan = driverTracer.spanBuilder(Driver.class.getSimpleName()).startSpan();
+                Tracer driverTracer = initTracer("DriverInsight");
+                Span driverSpan = driverTracer.spanBuilder(driver.getClass().getCanonicalName()).startSpan();
                 try (Scope dirverScope = driverSpan.makeCurrent()) {
                     Tracer connTracer = initTracer("Connection");
                     Span connSpan = connTracer.spanBuilder(targetUrl).startSpan();

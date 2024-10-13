@@ -9,7 +9,6 @@ import io.opentelemetry.context.Scope;
 
 import java.lang.reflect.*;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.Objects;
 
 import static insight.OtelFactory.initTracer;
