@@ -12,15 +12,19 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.logging.Logger;
 
-import static insight.OtelFactory.initTracer;
-
 public class DriverInsight implements Driver {
     private static final String URL_PREFIX = "jdbc:insight:";
+
+    private final OtelFactory otelFactory;
+
+    public DriverInsight(OtelFactory otelFactory) {
+        this.otelFactory = otelFactory;
+    }
 
     @Override
     public Connection connect(String url, Properties properties) throws SQLException {
         String targetUrl = removeUrlPrefix(url);
-        Properties urlProps = parseUrl(targetUrl);
+        Properties urlProps = UrlParser.parse(targetUrl);
         Driver driver;
         String jdbcPath = (String) urlProps.get("jdbcPath");
         String mainClass = (String) urlProps.get("mainClass");
@@ -37,10 +41,10 @@ public class DriverInsight implements Driver {
         }
         if (Objects.nonNull(driver)) {
             if (driver.acceptsURL(targetUrl)) {
-                Tracer driverTracer = initTracer("DriverInsight");
+                Tracer driverTracer = otelFactory.initTracer("DriverInsight");
                 Span driverSpan = driverTracer.spanBuilder(driver.getClass().getCanonicalName()).startSpan();
                 try (Scope dirverScope = driverSpan.makeCurrent()) {
-                    Tracer connTracer = initTracer("Connection");
+                    Tracer connTracer = otelFactory.initTracer("Connection");
                     Span connSpan = connTracer.spanBuilder(targetUrl).startSpan();
                     try (Scope connScope = connSpan.makeCurrent()) {
                         return wrapWithProxy(driver.connect(targetUrl, properties), connTracer, Context.current());
@@ -55,24 +59,11 @@ public class DriverInsight implements Driver {
         throw new SQLException("No suitable driver found for " + targetUrl);
     }
 
-    private Properties parseUrl(String url) {
-        URI uri = URI.create(url.substring(5));
-        Properties props = new Properties();
-        if (!Objects.isNull(uri.getQuery())) {
-            for (String param : uri.getQuery().split("&")) {
-                String[] keyValue = param.split("=");
-                props.put(keyValue[0], keyValue[1]);
-                props.put("key", "value");
-            }
-        }
-        return props;
-    }
-
     private Connection wrapWithProxy(Connection conn, Tracer tracer, Context parentContext) {
         Connection proxy = (Connection) Proxy.newProxyInstance(
                 conn.getClass().getClassLoader(),
                 conn.getClass().getInterfaces(),
-                new GenericInvocationHandler(conn, tracer, parentContext)
+                new GenericInvocationHandler(otelFactory, conn, tracer, parentContext)
         );
         return proxy;
     }
