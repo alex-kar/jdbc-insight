@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Properties;
 
 public class UrlParser {
+
     public static Properties parse(String url) {
         URI uri = URI.create(url.substring(5));
         Properties props = new Properties();
@@ -12,9 +13,9 @@ public class UrlParser {
             for (String param : uri.getQuery().split("&")) {
                 String[] keyValue = param.split("=");
                 props.put(keyValue[0], keyValue[1]);
-                props.put("key", "value");
             }
         }
         return props;
     }
+
 }
