@@ -17,6 +17,10 @@ public class DriverInsight implements Driver {
 
     private final OtelFactory otelFactory;
 
+    public DriverInsight() {
+        this.otelFactory = new OtelFactory();
+    }
+
     public DriverInsight(OtelFactory otelFactory) {
         this.otelFactory = otelFactory;
     }
@@ -63,7 +67,7 @@ public class DriverInsight implements Driver {
         Connection proxy = (Connection) Proxy.newProxyInstance(
                 conn.getClass().getClassLoader(),
                 conn.getClass().getInterfaces(),
-                new GenericInvocationHandler(otelFactory, conn, tracer, parentContext)
+                new GenericInvocationHandler(conn, tracer, parentContext)
         );
         return proxy;
     }
