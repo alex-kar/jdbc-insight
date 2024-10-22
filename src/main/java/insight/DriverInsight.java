@@ -27,6 +27,10 @@ public class DriverInsight implements Driver {
 
     @Override
     public Connection connect(String url, Properties properties) throws SQLException {
+        if (!acceptsURL(url)) {
+            return null;
+        }
+
         String targetUrl = removeUrlPrefix(url);
         Properties urlProps = UrlParser.parse(targetUrl);
         Driver driver;
@@ -75,13 +79,7 @@ public class DriverInsight implements Driver {
 
     @Override
     public boolean acceptsURL(String url) throws SQLException {
-        if (Objects.isNull(url) || !url.startsWith(URL_PREFIX)) {
-            return false;
-        }
-        String targetUrl = removeUrlPrefix(url);
-        Driver driver = DriverManager.getDriver(targetUrl);
-        boolean result = Objects.nonNull(driver);
-        return result;
+        return Objects.nonNull(url) && url.startsWith(URL_PREFIX);
     }
 
     @Override
