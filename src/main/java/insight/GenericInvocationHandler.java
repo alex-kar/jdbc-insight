@@ -32,9 +32,10 @@ public class GenericInvocationHandler implements InvocationHandler {
                 .setParent(context)
                 .startSpan();
         try (Scope scope = span.makeCurrent()) {
-            Object result = invokeMethod(method, args, Context.current());
+            Object result = method.invoke(delegate, args);
+            Object proxyResult = proxyIfInterface(method, args, Context.current(), result);
             setAttributes(span, method, args, result);
-            return result;
+            return proxyResult;
         } catch (Exception e) {
             span.recordException(e, Attributes.of(AttributeKey.booleanKey("exception.escaped"), true));
             span.setAttribute(AttributeKey.booleanKey("error"), true);
@@ -55,7 +56,7 @@ public class GenericInvocationHandler implements InvocationHandler {
         }
     }
 
-    private Object invokeMethod(Method method, Object[] args, Context context) throws InvocationTargetException, IllegalAccessException {
+    private Object proxyIfInterface(Method method, Object[] args, Context context, Object delegate) throws InvocationTargetException, IllegalAccessException {
         Class<?> returnType = method.getReturnType();
         if (returnType.isInterface()) {
             Tracer tracer = initTracer(returnType.getSimpleName());
@@ -66,20 +67,19 @@ public class GenericInvocationHandler implements InvocationHandler {
                 }
             }
             Context nodeContext = initTreeNode(tracer, context, nodeName);
-            return proxy(method, args, tracer, nodeContext);
+            return proxy(delegate, tracer, nodeContext);
         }
-        return method.invoke(delegate, args);
+        return delegate;
     }
 
-    private Object proxy(Method method, Object[] args, Tracer tracer, Context context) throws InvocationTargetException, IllegalAccessException {
-        Object result = method.invoke(delegate, args);
-        if (Objects.isNull(result)) {
+    private Object proxy(Object delegate, Tracer tracer, Context context) {
+        if (Objects.isNull(delegate)) {
             return null;
         }
         return Proxy.newProxyInstance(
-                result.getClass().getClassLoader(),
-                result.getClass().getInterfaces(),
-                new GenericInvocationHandler(result, tracer, context)
+                delegate.getClass().getClassLoader(),
+                delegate.getClass().getInterfaces(),
+                new GenericInvocationHandler(delegate, tracer, context)
         );
     }
 
