@@ -11,7 +11,6 @@ import java.lang.reflect.*;
 import java.sql.ResultSet;
 import java.util.Objects;
 
-import static insight.OtelFactory.initTracer;
 import static insight.Utils.buildMethodSignature;
 import static insight.Utils.initTreeNode;
 
@@ -19,11 +18,13 @@ public class GenericInvocationHandler implements InvocationHandler {
     private final Object delegate;
     private final Tracer tracer;
     private final Context context;
+    private final OtelFactory otelFactory;
 
-    public GenericInvocationHandler(Object origin, Tracer tracer, Context context) {
+    public GenericInvocationHandler(Object origin, Tracer tracer, Context context, OtelFactory otelFactory) {
         this.delegate = origin;
         this.tracer = tracer;
         this.context = context;
+        this.otelFactory = otelFactory;
     }
 
     @Override
@@ -33,7 +34,7 @@ public class GenericInvocationHandler implements InvocationHandler {
                 .startSpan();
         try (Scope scope = span.makeCurrent()) {
             Object result = method.invoke(delegate, args);
-            Object proxyResult = proxyIfInterface(method, args, Context.current(), result);
+            Object proxyResult = proxyIfInterface(method, args, Context.current(), result, otelFactory);
             setAttributes(span, method, args, result);
             return proxyResult;
         } catch (Exception e) {
@@ -56,10 +57,10 @@ public class GenericInvocationHandler implements InvocationHandler {
         }
     }
 
-    private Object proxyIfInterface(Method method, Object[] args, Context context, Object delegate) throws InvocationTargetException, IllegalAccessException {
+    private Object proxyIfInterface(Method method, Object[] args, Context context, Object delegate, OtelFactory otelFactory) throws InvocationTargetException, IllegalAccessException {
         Class<?> returnType = method.getReturnType();
         if (returnType.isInterface()) {
-            Tracer tracer = initTracer(returnType.getSimpleName());
+            Tracer tracer = otelFactory.initTracer(returnType.getSimpleName());
             String nodeName = returnType.getSimpleName();
             if (method.getReturnType().isAssignableFrom(ResultSet.class)) {
                 if (!Objects.isNull(args)) {
@@ -67,19 +68,19 @@ public class GenericInvocationHandler implements InvocationHandler {
                 }
             }
             Context nodeContext = initTreeNode(tracer, context, nodeName);
-            return proxy(delegate, tracer, nodeContext);
+            return proxy(delegate, tracer, nodeContext, otelFactory);
         }
         return delegate;
     }
 
-    private Object proxy(Object delegate, Tracer tracer, Context context) {
+    private Object proxy(Object delegate, Tracer tracer, Context context, OtelFactory otelFactory) {
         if (Objects.isNull(delegate)) {
             return null;
         }
         return Proxy.newProxyInstance(
                 delegate.getClass().getClassLoader(),
                 delegate.getClass().getInterfaces(),
-                new GenericInvocationHandler(delegate, tracer, context)
+                new GenericInvocationHandler(delegate, tracer, context, otelFactory)
         );
     }
 

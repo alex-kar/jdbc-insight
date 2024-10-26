@@ -12,7 +12,7 @@ import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 
 public class OtelFactory {
 
-    public static Tracer initTracer(String serviceName) {
+    public Tracer initTracer(String serviceName) {
         OtlpGrpcSpanExporter grpcSpanExporter = OtlpGrpcSpanExporter.builder()
                 .setEndpoint("http://127.0.0.1:4317")
                 .build();

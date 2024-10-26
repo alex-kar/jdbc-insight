@@ -1,5 +1,7 @@
 package insight;
 
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
@@ -16,6 +18,7 @@ public class DriverInsight implements Driver {
     private static final String URL_PREFIX = "jdbc:insight:";
 
     private final OtelFactory otelFactory;
+    private Tracer driverTracer;
 
     public DriverInsight() {
         this.otelFactory = new OtelFactory();
@@ -25,53 +28,66 @@ public class DriverInsight implements Driver {
         this.otelFactory = otelFactory;
     }
 
+    private void init(OtelFactory otelFactory) {
+        this.driverTracer = otelFactory.initTracer("DriverInsight");
+    }
+
     @Override
     public Connection connect(String url, Properties properties) throws SQLException {
         if (!acceptsURL(url)) {
             return null;
         }
+        init(otelFactory);
 
-        String targetUrl = removeUrlPrefix(url);
-        Properties urlProps = UrlParser.parse(targetUrl);
-        Driver driver;
-        String jdbcPath = (String) urlProps.get("jdbcPath");
-        String mainClass = (String) urlProps.get("mainClass");
-        if (!Objects.isNull(jdbcPath) && !Objects.isNull(mainClass)) {
-            try {
-                URLClassLoader classLoader = new URLClassLoader(new URL[]{new URL("file:" + jdbcPath)}, this.getClass().getClassLoader());
-                driver = (Driver) Class.forName(mainClass, true, classLoader).newInstance();
-            } catch (MalformedURLException | ClassNotFoundException |
-                     InstantiationException | IllegalAccessException e) {
-                throw new RuntimeException(e);
-            }
-        } else {
-            try {
-                driver = DriverManager.getDriver(targetUrl);
-                Tracer driverTracer = otelFactory.initTracer("DriverInsight");
-                Span driverSpan = driverTracer.spanBuilder(driver.getClass().getCanonicalName()).startSpan();
-                try (Scope dirverScope = driverSpan.makeCurrent()) {
-                    Tracer connTracer = otelFactory.initTracer("Connection");
-                    Span connSpan = connTracer.spanBuilder(targetUrl).startSpan();
-                    try (Scope connScope = connSpan.makeCurrent()) {
-                        return wrapWithProxy(driver.connect(targetUrl, properties), connTracer, Context.current());
-                    } finally {
-                        connSpan.end();
-                    }
-                } finally {
-                    driverSpan.end();
+        Span driverSpan = driverTracer.spanBuilder("find driver").startSpan();
+        try (Scope dirverScope = driverSpan.makeCurrent()) {
+            String targetUrl = removeUrlPrefix(url);
+            Properties urlProps = UrlParser.parse(targetUrl);
+            Driver driver;
+            String jdbcPath = (String) urlProps.get("jdbcPath");
+            String mainClass = (String) urlProps.get("mainClass");
+            if (!Objects.isNull(jdbcPath) && !Objects.isNull(mainClass)) {
+                try {
+                    URLClassLoader classLoader = new URLClassLoader(new URL[]{new URL("file:" + jdbcPath)}, this.getClass().getClassLoader());
+                    driver = (Driver) Class.forName(mainClass, true, classLoader).newInstance();
+                } catch (MalformedURLException | ClassNotFoundException |
+                         InstantiationException | IllegalAccessException e) {
+                    throw new RuntimeException(e);
                 }
-            } catch(SQLException e) {
-                throw new SQLException("No suitable driver found for " + targetUrl);
+            } else {
+                try {
+                    driver = DriverManager.getDriver(targetUrl);
+                    Span delegateSpan = driverTracer.spanBuilder(driver.getClass().getCanonicalName()).startSpan();
+                    try (Scope delegateScope = driverSpan.makeCurrent()) {
+                        Tracer connTracer = otelFactory.initTracer("Connection");
+                        Span connSpan = connTracer.spanBuilder(targetUrl).startSpan();
+                        try (Scope connScope = connSpan.makeCurrent()) {
+                            return wrapWithProxy(driver.connect(targetUrl, properties), connTracer, Context.current(), otelFactory);
+                        } finally {
+                            connSpan.end();
+                        }
+                    } finally {
+                        delegateSpan.end();
+                    }
+                } catch (SQLException e) {
+                    throw new SQLException("No suitable driver found for " + targetUrl);
+                }
             }
+        } catch(Exception e) {
+            driverSpan.recordException(e, Attributes.of(AttributeKey.booleanKey("exception.escaped"), true));
+            driverSpan.setAttribute(AttributeKey.booleanKey("error"), true);
+            throw e;
+        } finally {
+            driverSpan.end();
         }
         return null;
     }
 
-    private Connection wrapWithProxy(Connection conn, Tracer tracer, Context parentContext) {
+    private Connection wrapWithProxy(Connection conn, Tracer tracer, Context parentContext, OtelFactory otelFactory) {
         Connection proxy = (Connection) Proxy.newProxyInstance(
                 conn.getClass().getClassLoader(),
                 conn.getClass().getInterfaces(),
-                new GenericInvocationHandler(conn, tracer, parentContext)
+                new GenericInvocationHandler(conn, tracer, parentContext, otelFactory)
         );
         return proxy;
     }
