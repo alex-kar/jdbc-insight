@@ -45,10 +45,8 @@ public class DriverInsight implements Driver {
                 throw new RuntimeException(e);
             }
         } else {
-            driver = DriverManager.getDriver(targetUrl);
-        }
-        if (Objects.nonNull(driver)) {
-            if (driver.acceptsURL(targetUrl)) {
+            try {
+                driver = DriverManager.getDriver(targetUrl);
                 Tracer driverTracer = otelFactory.initTracer("DriverInsight");
                 Span driverSpan = driverTracer.spanBuilder(driver.getClass().getCanonicalName()).startSpan();
                 try (Scope dirverScope = driverSpan.makeCurrent()) {
@@ -62,9 +60,11 @@ public class DriverInsight implements Driver {
                 } finally {
                     driverSpan.end();
                 }
+            } catch(SQLException e) {
+                throw new SQLException("No suitable driver found for " + targetUrl);
             }
         }
-        throw new SQLException("No suitable driver found for " + targetUrl);
+        return null;
     }
 
     private Connection wrapWithProxy(Connection conn, Tracer tracer, Context parentContext) {
@@ -79,7 +79,10 @@ public class DriverInsight implements Driver {
 
     @Override
     public boolean acceptsURL(String url) throws SQLException {
-        return Objects.nonNull(url) && url.startsWith(URL_PREFIX);
+        if (Objects.isNull(url)) {
+            throw new SQLException("URL is null");
+        }
+        return url.startsWith(URL_PREFIX);
     }
 
     @Override
