@@ -40,7 +40,7 @@ public class DriverInsight implements Driver {
         init(otelFactory);
         Span driverSpan = driverTracer.spanBuilder("connect").startSpan();
         String targetUrl = removeUrlPrefix(url);
-        Properties urlProps = UrlParser.parse(targetUrl);
+        Properties urlProps = PropsParser.parse(properties, targetUrl);
         String jdbcPath = (String) urlProps.get("jdbcPath");
         String mainClass = (String) urlProps.get("mainClass");
         Driver driver = loadDriver(jdbcPath, mainClass, targetUrl);
