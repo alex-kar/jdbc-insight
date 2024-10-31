@@ -9,8 +9,8 @@ public class PropsParser {
 
     private static final Set<String> supportedProps = Set.of(JDBC_PATH, JDBC_CLASS);
 
-    public static Map<String, String> parse(Properties props, String urlProps) {
-        Map<String, String> fromUrl = parseUrl(urlProps);
+    public static Map<String, String> parse(Properties props, String url) {
+        Map<String, String> fromUrl = parseUrl(url);
         Map<String, String> fromProps = parseProps(props);
         return override(fromProps, fromUrl);
     }
