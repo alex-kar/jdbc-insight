@@ -10,9 +10,13 @@ import io.opentelemetry.context.Scope;
 import java.lang.reflect.Proxy;
 import java.net.*;
 import java.sql.*;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.logging.Logger;
+
+import static insight.PropsParser.JDBC_CLASS;
+import static insight.PropsParser.JDBC_PATH;
 
 public class DriverInsight implements Driver {
     private static final String URL_PREFIX = "jdbc:insight:";
@@ -40,9 +44,9 @@ public class DriverInsight implements Driver {
         init(otelFactory);
         Span driverSpan = driverTracer.spanBuilder("connect").startSpan();
         String targetUrl = removeUrlPrefix(url);
-        Properties urlProps = PropsParser.parse(properties, targetUrl);
-        String jdbcPath = (String) urlProps.get("jdbcPath");
-        String mainClass = (String) urlProps.get("mainClass");
+        Map<String, String> urlProps = PropsParser.parse(properties, targetUrl);
+        String jdbcPath = urlProps.get(JDBC_PATH);
+        String mainClass = urlProps.get(JDBC_CLASS);
         Driver driver = loadDriver(jdbcPath, mainClass, targetUrl);
         try (Scope dirverScope = driverSpan.makeCurrent()) {
             try {
