@@ -34,8 +34,8 @@ public class PropsParser {
         Map<String, String> result = new HashMap<>();
         props.forEach((k,v) -> {
             if (k instanceof String key && v instanceof String value) {
-                if (supportedProps.contains(key)) {
-                    result.put(key, value);
+                if (supportedProps.contains(key.toLowerCase())) {
+                    result.put(key.toLowerCase(), value);
                 }
             }
         });

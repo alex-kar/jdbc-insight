@@ -2,6 +2,7 @@ package insight;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Named;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -10,8 +11,7 @@ import java.util.Properties;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import static insight.PropsParser.JDBC_CLASS;
-import static insight.PropsParser.JDBC_PATH;
+import static insight.PropsParser.*;
 import static org.junit.jupiter.api.Named.named;
 
 class UrlParserTest {
@@ -44,7 +44,10 @@ class UrlParserTest {
                                 Map.of(
                                         JDBC_PATH, "jdbc_path",
                                         JDBC_CLASS, "jdbc_class"
-                                ))
+                                ))),
+                named("Ignore unknown parameters",
+                        new ParseUrl("jdbc:postgresql://localhost:5432/database?unknown=value",
+                                Map.of())
                 ));
     }
 
@@ -97,7 +100,15 @@ class UrlParserTest {
                                 Map.of(
                                         JDBC_PATH, "jdbc_path",
                                         JDBC_CLASS, "jdbc_class"
-                                )))
+                                ))),
+                named("Ignore unknown parameters",
+                        new ParseProps(
+                                () -> {
+                                    Properties props = new Properties();
+                                    props.put("unknown", "value");
+                                    return props;
+                                },
+                                Map.of()))
         );
     }
 

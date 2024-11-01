@@ -17,7 +17,6 @@ import java.util.logging.Logger;
 
 import static insight.PropsParser.JDBC_CLASS;
 import static insight.PropsParser.JDBC_PATH;
-import static insight.Utils.initTreeNode;
 
 public class DriverInsight implements Driver {
     private static final String URL_PREFIX = "jdbc:insight:";
@@ -50,9 +49,12 @@ public class DriverInsight implements Driver {
         try (Scope insightConnectScope = insightConnectSpan.makeCurrent()) {
             context = Context.current();
             targetUrl = removeUrlPrefix(url);
-            Map<String, String> urlProps = PropsParser.parse(properties, targetUrl);
-            String jdbcPath = urlProps.get(JDBC_PATH);
-            String mainClass = urlProps.get(JDBC_CLASS);
+            Map<String, String> parsedProps = PropsParser.parse(properties, targetUrl);
+            insightConnectSpan.setAttribute("properties", properties.toString());
+            insightConnectSpan.setAttribute("url", url);
+            insightConnectSpan.setAttribute("recognized properties", parsedProps.toString());
+            String jdbcPath = parsedProps.get(JDBC_PATH);
+            String mainClass = parsedProps.get(JDBC_CLASS);
             driver = loadDriver(jdbcPath, mainClass, targetUrl);
         } catch (Exception e) {
             insightConnectSpan.recordException(e, Attributes.of(AttributeKey.booleanKey("exception.escaped"), true));
@@ -81,7 +83,7 @@ public class DriverInsight implements Driver {
     }
 
     private Driver loadDriver(String jdbcPath, String mainClass, String targetUrl) throws SQLException {
-        if (!Objects.isNull(jdbcPath) && !Objects.isNull(mainClass)) {
+        if (Objects.nonNull(jdbcPath) && Objects.nonNull(mainClass)) {
             try {
                 URLClassLoader classLoader = new URLClassLoader(new URL[]{new URL("file:" + jdbcPath)}, this.getClass().getClassLoader());
                 return (Driver) Class.forName(mainClass, true, classLoader).newInstance();
