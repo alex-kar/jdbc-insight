@@ -15,8 +15,8 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.logging.Logger;
 
-import static insight.PropsParser.JDBC_CLASS;
-import static insight.PropsParser.JDBC_PATH;
+import static insight.ConfigParser.JDBC_CLASS;
+import static insight.ConfigParser.JDBC_PATH;
 
 public class DriverInsight implements Driver {
     private static final String URL_PREFIX = "jdbc:insight:";
@@ -49,7 +49,7 @@ public class DriverInsight implements Driver {
         try (Scope insightConnectScope = insightConnectSpan.makeCurrent()) {
             context = Context.current();
             targetUrl = removeUrlPrefix(url);
-            Map<String, String> parsedProps = PropsParser.parse(properties, targetUrl);
+            Map<String, String> parsedProps = ConfigParser.parse(properties, targetUrl);
             insightConnectSpan.setAttribute("properties", properties.toString());
             insightConnectSpan.setAttribute("url", url);
             insightConnectSpan.setAttribute("recognized properties", parsedProps.toString());

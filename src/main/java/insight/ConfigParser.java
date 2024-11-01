@@ -3,7 +3,7 @@ package insight;
 import java.net.URI;
 import java.util.*;
 
-public class PropsParser {
+public class ConfigParser {
     public static final String JDBC_PATH = "jdbcpath";
     public static final String JDBC_CLASS = "jdbcclass";
 
