@@ -17,12 +17,13 @@ import java.util.logging.Logger;
 
 import static insight.PropsParser.JDBC_CLASS;
 import static insight.PropsParser.JDBC_PATH;
+import static insight.Utils.initTreeNode;
 
 public class DriverInsight implements Driver {
     private static final String URL_PREFIX = "jdbc:insight:";
 
     private final OtelFactory otelFactory;
-    private Tracer driverTracer;
+    private Tracer tracer;
 
     public DriverInsight() {
         this.otelFactory = new OtelFactory();
@@ -33,7 +34,7 @@ public class DriverInsight implements Driver {
     }
 
     private void init(OtelFactory otelFactory) {
-        this.driverTracer = otelFactory.initTracer("DriverInsight");
+        this.tracer = otelFactory.initTracer("DriverInsight");
     }
 
     @Override
@@ -42,33 +43,40 @@ public class DriverInsight implements Driver {
             return null;
         }
         init(otelFactory);
-        Span driverSpan = driverTracer.spanBuilder("connect").startSpan();
-        String targetUrl = removeUrlPrefix(url);
-        Map<String, String> urlProps = PropsParser.parse(properties, targetUrl);
-        String jdbcPath = urlProps.get(JDBC_PATH);
-        String mainClass = urlProps.get(JDBC_CLASS);
-        Driver driver = loadDriver(jdbcPath, mainClass, targetUrl);
+        Span insightConnectSpan = tracer.spanBuilder("connect").startSpan();
+        Driver driver;
+        String targetUrl;
+        Context context;
+        try (Scope insightConnectScope = insightConnectSpan.makeCurrent()) {
+            context = Context.current();
+            targetUrl = removeUrlPrefix(url);
+            Map<String, String> urlProps = PropsParser.parse(properties, targetUrl);
+            String jdbcPath = urlProps.get(JDBC_PATH);
+            String mainClass = urlProps.get(JDBC_CLASS);
+            driver = loadDriver(jdbcPath, mainClass, targetUrl);
+        } catch (Exception e) {
+            insightConnectSpan.recordException(e, Attributes.of(AttributeKey.booleanKey("exception.escaped"), true));
+            insightConnectSpan.setAttribute(AttributeKey.booleanKey("error"), true);
+            throw e;
+        } finally {
+            insightConnectSpan.end();
+        }
+        Tracer driverTracer = otelFactory.initTracer(driver.getClass().getCanonicalName());
+        Span driverSpan = driverTracer.spanBuilder("connect").setParent(context).startSpan();
         try (Scope dirverScope = driverSpan.makeCurrent()) {
-            try {
-                Span delegateSpan = driverTracer.spanBuilder(driver.getClass().getCanonicalName()).startSpan();
-                try (Scope delegateScope = driverSpan.makeCurrent()) {
-                    Tracer connTracer = otelFactory.initTracer("Connection");
-                    Span connSpan = connTracer.spanBuilder(targetUrl).startSpan();
-                    try (Scope connScope = connSpan.makeCurrent()) {
-                        return wrapWithProxy(driver.connect(targetUrl, properties), connTracer, Context.current(), otelFactory);
-                    } finally {
-                        connSpan.end();
-                    }
-                } finally {
-                    delegateSpan.end();
-                }
-            } catch (Exception e) {
-                driverSpan.recordException(e, Attributes.of(AttributeKey.booleanKey("exception.escaped"), true));
-                driverSpan.setAttribute(AttributeKey.booleanKey("error"), true);
-                throw e;
+            Tracer connTracer = otelFactory.initTracer("Connection");
+            Span connSpan = connTracer.spanBuilder(targetUrl).startSpan();
+            try (Scope connScope = connSpan.makeCurrent()) {
+                return wrapWithProxy(driver.connect(targetUrl, properties), connTracer, Context.current(), otelFactory);
             } finally {
-                driverSpan.end();
+                connSpan.end();
             }
+        } catch (Exception e) {
+            driverSpan.recordException(e, Attributes.of(AttributeKey.booleanKey("exception.escaped"), true));
+            driverSpan.setAttribute(AttributeKey.booleanKey("error"), true);
+            throw e;
+        } finally {
+            driverSpan.end();
         }
     }
 
